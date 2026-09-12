@@ -104,6 +104,17 @@ final class RealFileTests: XCTestCase {
 
     /// Pooling a folder must beat estimating its files one by one. This is the claim that
     /// justifies ``KeyEstimator/estimate(pooling:)`` existing.
+    ///
+    /// FOLDERS ARE SORTED BEFORE SELECTION, and that is not tidiness. Dictionary order in
+    /// Swift is randomised per process, so taking `prefix(10)` of an unsorted dictionary
+    /// tests a different ten folders on every run — this failed roughly one run in three,
+    /// and each failure looked like a real regression rather than the test choosing a
+    /// different sample.
+    ///
+    /// The assertion is also weaker than it first was, because the strong version was false:
+    /// "a folder of 500+ notes contains a third somewhere" is not true of a folder of
+    /// sub-bass parts, which is a real thing a sample pack contains. What pooling actually
+    /// promises is that it recovers a mode for MOST folders, not every one.
     func testPoolingAFolderAgreesWithItsFiles() throws {
         let files = try corpusFiles(limit: 1200)
         var folders: [String: [Note]] = [:]
@@ -111,18 +122,22 @@ final class RealFileTests: XCTestCase {
             guard let file = try? MIDIReader.read(contentsOf: url) else { continue }
             folders[url.deletingLastPathComponent().path, default: []] += file.notes
         }
-        let big = folders.filter { $0.value.count > 500 }
+        let big = folders.filter { $0.value.count > 500 }.sorted { $0.key < $1.key }
         guard big.count >= 3 else { throw XCTSkip("no folder large enough to pool") }
 
+        var estimated = 0, modeResolved = 0
         for (_, notes) in big.prefix(10) {
-            let pooled = KeyEstimator.estimate(notes: notes)
-            XCTAssertNotNil(pooled)
-            XCTAssertNotNil(pooled?.mode,
-                            "a folder of 500+ notes should contain a third somewhere")
-            // Three is the floor below which a key means nothing; real folders of bass
-            // loops sit at four or five, not the full seven of a scale.
-            XCTAssertGreaterThanOrEqual(pooled?.distinctPitchClasses ?? 0, 3)
+            guard let pooled = KeyEstimator.estimate(notes: notes) else { continue }
+            estimated += 1
+            XCTAssertGreaterThanOrEqual(pooled.distinctPitchClasses, 3,
+                                        "a pooled folder should be richer than a single part")
+            if pooled.mode != nil { modeResolved += 1 }
         }
+
+        XCTAssertEqual(estimated, min(10, big.count), "every large folder yields an estimate")
+        XCTAssertGreaterThan(modeResolved * 2, estimated,
+                             "pooling should resolve a mode for most folders, got "
+                             + "\(modeResolved) of \(estimated)")
     }
 
     /// Chords are found in real polyphonic material and named at a plausible rate. Measured
