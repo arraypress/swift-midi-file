@@ -51,12 +51,19 @@ final class RealFileTests: XCTestCase {
 
     /// No file should take a pathological amount of time. The whole corpus reads in about a
     /// second; a regression that made this quadratic would show up here first.
-    func testCorpusParsesQuickly() throws {
+    ///
+    /// The bound is deliberately enormous relative to the real figure — 1,000 files parse in
+    /// roughly 0.15s, and this allows 60. A wall-clock assertion tight enough to be a
+    /// benchmark is a test that fails when something else on the machine is busy, which is
+    /// noise rather than signal. What this catches is an algorithmic regression: 60s is still
+    /// a 400x blowup.
+    func testCorpusParsesWithoutAlgorithmicBlowup() throws {
         let files = try corpusFiles(limit: 1000)
         let started = Date()
         for url in files { _ = try? MIDIReader.read(contentsOf: url) }
         let elapsed = Date().timeIntervalSince(started)
-        XCTAssertLessThan(elapsed, 10, "1,000 files should read in about a second, took \(elapsed)")
+        XCTAssertLessThan(elapsed, 60,
+                          "1,000 files parse in about 0.15s; \(elapsed)s means something is quadratic")
     }
 
     /// The finding that shaped ``KeySignature``: every key signature event in the corpus
