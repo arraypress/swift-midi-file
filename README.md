@@ -39,6 +39,7 @@ against.
 |---|---|
 | Files parsed | **6,013 of 6,013**, no failures, in **0.9 s** |
 | Notes read | 468,589 |
+| Round trip: read → write → read | **6,013 of 6,013** identical |
 | Key root, one file | **77%** (2,403 files) |
 | Key root, one folder pooled (20+ files) | **92%** (66 folders) |
 | Key root + mode, one file | **37%** (108 files labelled with a mode) |
@@ -80,6 +81,17 @@ where per-file estimation was a coin flip. Only pool material that belongs toget
 average to a third that neither is in, and a low `correlation` is what gives a mixed folder
 away.
 
+**Pooling works on a folder of loops; it does not work on a construction kit.** Measured over
+58 kits whose folders name a key: 43–46%, however the stems are filtered. A kit is one song
+rather than one key, most of its stems are rhythm triggers on a fixed note (the kick, and often
+the bass), and the few melodic ones emphasise chord tones instead of the tonic — one kit's
+pluck reads Bm where the kit is Em, B being the fifth. Don't auto-label kits.
+
+**To filter individual files, use `margin`, not `isWellSupported`.** The latter is a guard for
+*mode* and makes *roots* worse: 69% against 80% ungated, because it discards one- and
+two-pitch-class files, which are the easiest roots to get right. `margin` behaves properly —
+81% at 0.10, 87% at 0.15, 90% at 0.20.
+
 ## Chords are exact; only the name is interpretation
 
 This is where MIDI beats audio outright. This fleet's own `AudioTimbre` abandoned its chord
@@ -96,6 +108,41 @@ chord.name          // "C", "Am7", "C/E", "F#5" — or nil
 
 Inversions are written with a slash. A chord with no third is named `5`, not guessed into a
 mode.
+
+## Writing
+
+The library writes as well as reads, and ``Composition`` is the door in:
+
+```swift
+var song = Composition(bpm: 138)
+song.addTrack(name: "Bass", channel: 0) { track in
+    track.note("F#2", atBeat: 0, lasting: 0.5)
+    track.note("A2",  atBeat: 1, lasting: 0.5)
+}
+song.addTrack(name: "Pad", channel: 1, program: 48) { track in
+    track.chord(["F#4", "A4", "C#5"], atBeat: 0, lasting: 4)
+}
+try song.build().write(to: url)
+```
+
+`build()` returns a `MIDIFile`, so anything you construct can be analysed with the same key
+and chord code as a file off disk — which is how the tests check that a progression spells
+what it was meant to.
+
+A writer has no 31,250-baud cable to squeeze through, so this one never uses running status
+and always emits a real note-off. The output is **1% larger** than the DAW's and unambiguous
+to every reader, including careless ones.
+
+**Round-tripped over the whole corpus: 6,013 of 6,013 files come back identical** — same
+pitches, same start ticks, same durations, same track names. Two bugs were found that way and
+neither would have shown up in a unit test:
+
+- A **zero-length note** made the writer emit that note's own off before its own on (releases
+  are ordered before strikes, so one note ending as another begins doesn't read as an overlap).
+  The reader was left with an open note that swallowed the next note's off, and every duration
+  after it in the track was wrong. Zero-length notes are now widened to one tick.
+- An **empty track name** was reported as `""` by the reader and omitted by the writer, so it
+  vanished on the round trip. An empty name is now `nil`.
 
 ## What it handles
 

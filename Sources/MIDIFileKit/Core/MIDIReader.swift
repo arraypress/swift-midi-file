@@ -231,9 +231,19 @@ public enum MIDIReader {
         case 0x01:
             out.texts.append((tick, text()))
         case 0x03:
-            if out.name == nil { out.name = text().trimmingCharacters(in: .whitespaces) }
+            // An empty or whitespace-only name is not a name. Reported as nil so that a
+            // caller's `name ?? fallback` works, and so that a write of what was read
+            // produces a file that reads back the same — an empty string survived here once
+            // and vanished on the round trip.
+            if out.name == nil {
+                let trimmed = text().trimmingCharacters(in: .whitespaces)
+                out.name = trimmed.isEmpty ? nil : trimmed
+            }
         case 0x04:
-            if out.instrument == nil { out.instrument = text().trimmingCharacters(in: .whitespaces) }
+            if out.instrument == nil {
+                let trimmed = text().trimmingCharacters(in: .whitespaces)
+                out.instrument = trimmed.isEmpty ? nil : trimmed
+            }
         case 0x06:
             out.markers.append((tick, text()))
         case 0x51 where payload.count == 3:

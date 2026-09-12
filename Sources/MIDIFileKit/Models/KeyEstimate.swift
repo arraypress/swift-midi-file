@@ -116,5 +116,15 @@ public struct KeyEstimate: Codable, Hashable, Sendable {
     ///
     /// Three pitch classes is the floor: two can be a root and a fifth, which is every key
     /// that contains both and is most of them.
+    ///
+    /// **This is a guard for ``mode``, and using it to filter ROOTS makes them worse.**
+    /// Measured over 2,254 ground-truth loops: naming every file gives 80% root accuracy,
+    /// while keeping only the well-supported ones gives **69%**. The gate removes files with
+    /// one or two pitch classes — and a one-note bassline is the EASIEST root to get right,
+    /// so filtering on this throws away the sure things and keeps the arguable ones.
+    ///
+    /// To filter roots, use ``margin`` instead, which behaves the way a confidence should:
+    /// 81% at 0.10, 87% at 0.15, 90% at 0.20, for 43%, 35% and 29% of files respectively.
+    /// Better still, pool the folder — see ``KeyEstimator/estimate(pooling:)``.
     public var isWellSupported: Bool { distinctPitchClasses >= 3 && correlation >= 0.5 }
 }
