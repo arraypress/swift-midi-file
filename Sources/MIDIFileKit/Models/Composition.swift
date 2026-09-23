@@ -65,6 +65,7 @@ public struct Composition {
         public var channel: Int
         public var program: Int?
         fileprivate var pending: [(pitch: Int, beat: Double, length: Double, velocity: Int)] = []
+        fileprivate var controls: [(controller: Int, value: Int, beat: Double)] = []
 
         fileprivate init(name: String?, channel: Int, program: Int?) {
             self.name = name
@@ -109,6 +110,17 @@ public struct Composition {
                 }
             }
             return allResolved
+        }
+
+        /// Add a control change on this track's channel — `sustain(down:atBeat:)` is the
+        /// common case.
+        public mutating func controlChange(_ controller: Int, value: Int, atBeat beat: Double) {
+            controls.append((min(127, max(0, controller)), min(127, max(0, value)), max(0, beat)))
+        }
+
+        /// Sustain pedal down (127) or up (0) at `beat`.
+        public mutating func sustain(down: Bool, atBeat beat: Double) {
+            controlChange(ControlChange.sustainPedal, value: down ? 127 : 0, atBeat: beat)
         }
 
         /// Add notes already modelled — a phrase read from another file, transposed or not.
@@ -168,6 +180,10 @@ public struct Composition {
         let instruments = tracks.enumerated().compactMap { index, builder in
             builder.program.map { Instrument(atTicks: 0, channel: builder.channel, program: $0) }
         }
+        let controlChanges = tracks.flatMap { builder in
+            builder.controls.map { ControlChange(atTicks: Int(($0.beat * ticks).rounded()), channel: builder.channel,
+                                                 controller: $0.controller, value: $0.value) }
+        }
 
         return MIDIFile(
             format: built.count > 1 ? 1 : 0,
@@ -179,7 +195,8 @@ public struct Composition {
             declaredKeys: [],
             markers: markers.map { (Int(($0.beat * ticks).rounded()), $0.text) },
             texts: [],
-            instruments: instruments)
+            instruments: instruments,
+            controlChanges: controlChanges)
     }
 
     /// Parse a pitch name — "C4", "F#2", "Bb3", "Eb-1" — into a MIDI note number.

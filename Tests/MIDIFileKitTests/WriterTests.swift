@@ -274,4 +274,24 @@ final class WriterTests: XCTestCase {
         XCTAssertEqual(reread.notes.first?.pitch.name, "F#4")
         XCTAssertEqual(reread.tempoMap.initial.bpm, 140, accuracy: 0.1)
     }
+
+    /// Sustain pedal written as controller 64 on the notes' channel, read back in order.
+    func testControlChangesRoundTrip() throws {
+        var composition = Composition(bpm: 120, timeSignature: (4, 4), ticksPerQuarterNote: 480)
+        composition.addTrack(name: "piano", channel: 0, program: 0) { track in
+            track.note(60, atBeat: 0, lasting: 1, velocity: 90)
+            track.sustain(down: true, atBeat: 0.5)
+            track.note(64, atBeat: 1, lasting: 1, velocity: 70)
+            track.sustain(down: false, atBeat: 1.75)
+            track.controlChange(1, value: 33, atBeat: 2)
+        }
+        let file = composition.build()
+        XCTAssertEqual(file.controlChanges.map(\.controller), [64, 64, 1])
+        let data = try MIDIWriter.data(for: file)
+        let read = try MIDIReader.read(data)
+        XCTAssertEqual(read.controlChanges.map { ($0.atTicks, $0.controller, $0.value) }.map { "\($0)" },
+                       [(240, 64, 127), (840, 64, 0), (960, 1, 33)].map { "\($0)" })
+        XCTAssertEqual(read.controlChanges.map(\.channel), [0, 0, 0])
+        XCTAssertEqual(read.notes.map(\.velocity), [90, 70])
+    }
 }

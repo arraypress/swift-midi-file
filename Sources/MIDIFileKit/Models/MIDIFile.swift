@@ -50,6 +50,9 @@ public struct MIDIFile: Codable, Hashable, Sendable {
     /// fallback rather than an error.
     public let instruments: [Instrument]
 
+    /// Control changes — sustain pedal and the like — in file order.
+    public let controlChanges: [ControlChange]
+
     /// Every note in the file, in start order, across all tracks.
     public var notes: [Note] {
         tracks.flatMap(\.notes).sorted {
@@ -118,7 +121,7 @@ public struct MIDIFile: Codable, Hashable, Sendable {
     // them spelled out, which is why this type has hand-written coding rather than synthesised.
     private enum CodingKeys: String, CodingKey {
         case format, division, tracks, tempoMap, timeSignatures, declaredKeys
-        case markers, texts, instruments
+        case markers, texts, instruments, controlChanges
     }
 
     private struct TextEvent: Codable, Hashable, Sendable {
@@ -129,7 +132,7 @@ public struct MIDIFile: Codable, Hashable, Sendable {
     init(format: Int, division: Division, tracks: [Track], tempoMap: TempoMap,
          timeSignatures: [TimeSignature], declaredKeys: [KeySignature],
          markers: [(atTicks: Int, text: String)], texts: [(atTicks: Int, text: String)],
-         instruments: [Instrument] = []) {
+         instruments: [Instrument] = [], controlChanges: [ControlChange] = []) {
         self.format = format
         self.division = division
         self.tracks = tracks
@@ -139,6 +142,7 @@ public struct MIDIFile: Codable, Hashable, Sendable {
         self.markers = markers
         self.texts = texts
         self.instruments = instruments
+        self.controlChanges = controlChanges
     }
 
     public init(from decoder: Decoder) throws {
@@ -152,6 +156,7 @@ public struct MIDIFile: Codable, Hashable, Sendable {
         markers = try c.decode([TextEvent].self, forKey: .markers).map { ($0.atTicks, $0.text) }
         texts = try c.decode([TextEvent].self, forKey: .texts).map { ($0.atTicks, $0.text) }
         instruments = try c.decodeIfPresent([Instrument].self, forKey: .instruments) ?? []
+        controlChanges = try c.decodeIfPresent([ControlChange].self, forKey: .controlChanges) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -165,6 +170,7 @@ public struct MIDIFile: Codable, Hashable, Sendable {
         try c.encode(markers.map { TextEvent(atTicks: $0.atTicks, text: $0.text) }, forKey: .markers)
         try c.encode(texts.map { TextEvent(atTicks: $0.atTicks, text: $0.text) }, forKey: .texts)
         try c.encode(instruments, forKey: .instruments)
+        try c.encode(controlChanges, forKey: .controlChanges)
     }
 
     public static func == (lhs: MIDIFile, rhs: MIDIFile) -> Bool {

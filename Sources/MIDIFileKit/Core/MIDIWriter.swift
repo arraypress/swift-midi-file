@@ -92,6 +92,14 @@ public enum MIDIWriter {
                                 UInt8(clamping: instrument.program) & 0x7F]))
             }
 
+            // Control changes at a tick go before that tick's note-offs and note-ons, so a
+            // pedal lifted and a note struck on the same beat read back in that order.
+            for change in file.controlChanges where trackOwnsChannel(change.channel, track: track, index: index) {
+                events.append((change.atTicks, 2,
+                               [0xB0 | UInt8(change.channel & 0x0F),
+                                UInt8(clamping: change.controller) & 0x7F, UInt8(clamping: change.value) & 0x7F]))
+            }
+
             for note in track.notes {
                 let channel = UInt8(note.channel & 0x0F)
                 // A ZERO-LENGTH NOTE IS WIDENED TO ONE TICK, and this is not cosmetic. Releases
@@ -151,8 +159,12 @@ public enum MIDIWriter {
     /// goes on the track whose notes use that channel. If no track claims the channel it
     /// lands on the first, where a reader will still find it.
     private static func trackOwns(_ instrument: Instrument, track: Track, index: Int) -> Bool {
-        if track.notes.contains(where: { $0.channel == instrument.channel }) { return true }
-        return index == 0 && !track.notes.contains { $0.channel == instrument.channel }
+        trackOwnsChannel(instrument.channel, track: track, index: index)
+    }
+
+    private static func trackOwnsChannel(_ channel: Int, track: Track, index: Int) -> Bool {
+        if track.notes.contains(where: { $0.channel == channel }) { return true }
+        return index == 0 && !track.notes.contains { $0.channel == channel }
             && track.channels.isEmpty
     }
 

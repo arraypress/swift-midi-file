@@ -58,6 +58,7 @@ public enum MIDIReader {
         var markers: [(atTicks: Int, text: String)] = []
         var texts: [(atTicks: Int, text: String)] = []
         var instruments: [Instrument] = []
+        var controlChanges: [ControlChange] = []
 
         var trackIndex = 0
         while !reader.isAtEnd {
@@ -80,6 +81,7 @@ public enum MIDIReader {
             markers += parsed.markers
             texts += parsed.texts
             instruments += parsed.instruments
+            controlChanges += parsed.controlChanges
             tracks.append(Track(index: trackIndex, name: parsed.name,
                                 instrument: parsed.instrument, notes: parsed.rawNotes))
             trackIndex += 1
@@ -106,7 +108,8 @@ public enum MIDIReader {
         return MIDIFile(format: format, division: division, tracks: timed, tempoMap: map,
                         timeSignatures: timeSignatures.sorted { $0.atTicks < $1.atTicks },
                         declaredKeys: declaredKeys, markers: markers, texts: texts,
-                        instruments: instruments.sorted { $0.atTicks < $1.atTicks })
+                        instruments: instruments.sorted { $0.atTicks < $1.atTicks },
+                        controlChanges: controlChanges.sorted { $0.atTicks < $1.atTicks })
     }
 
     // MARK: - One track
@@ -116,6 +119,7 @@ public enum MIDIReader {
         var instrument: String?
         var rawNotes: [Note] = []
         var instruments: [Instrument] = []
+        var controlChanges: [ControlChange] = []
         var tempos: [Tempo] = []
         var timeSignatures: [TimeSignature] = []
         var keys: [KeySignature] = []
@@ -187,6 +191,9 @@ public enum MIDIReader {
                                  startBeats: 0, durationBeats: 0,
                                  startSeconds: 0, durationSeconds: 0))
                     }
+                case 0xB0:
+                    out.controlChanges.append(ControlChange(atTicks: tick, channel: channel,
+                                                            controller: Int(data[0]), value: Int(data[1])))
                 case 0xC0:
                     // Program change: which General MIDI instrument plays this channel.
                     // Absent from every file in the measured loop corpus and present in

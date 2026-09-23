@@ -47,6 +47,13 @@ against.
 | Files with 3+ notes sounding at once | 31% |
 | Chord spans that could be named | 69% |
 
+## Control changes (0.4.0)
+
+`MIDIFile.controlChanges` carries every controller message (sustain pedal 64, modulation 1,
+volume 7…) with its tick and channel; the reader collects them and the writer puts each on the
+track whose notes use its channel, ordered before that tick's notes. `Composition.Builder` gains
+`controlChange(_:value:atBeat:)` and `sustain(down:atBeat:)`. Round-tripped in the tests.
+
 ## Two findings that shaped the API
 
 **The key signature in the file is almost always a lie.** Across the corpus, every single key
