@@ -54,6 +54,14 @@ volume 7…) with its tick and channel; the reader collects them and the writer 
 track whose notes use its channel, ordered before that tick's notes. `Composition.Builder` gains
 `controlChange(_:value:atBeat:)` and `sustain(down:atBeat:)`. Round-tripped in the tests.
 
+## Pitch bends (0.5.0)
+
+`MIDIFile.pitchBends` carries every pitch-bend message as its 14-bit value (0…16383, 8192 at
+centre) on a channel; `semitones(range:)` reads one against a bend range, since the file does
+not record the range and General MIDI's default is ±2. In a `Composition`, `pitchBend(_:atBeat:)`
+adds one and `PitchBend.value(semitones:range:)` computes the value for a bend in semitones.
+Round-tripped in the tests.
+
 ## Two findings that shaped the API
 
 **The key signature in the file is almost always a lie.** Across the corpus, every single key

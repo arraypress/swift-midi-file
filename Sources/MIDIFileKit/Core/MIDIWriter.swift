@@ -100,6 +100,12 @@ public enum MIDIWriter {
                                 UInt8(clamping: change.controller) & 0x7F, UInt8(clamping: change.value) & 0x7F]))
             }
 
+            for bend in file.pitchBends where trackOwnsChannel(bend.channel, track: track, index: index) {
+                events.append((bend.atTicks, 2,
+                               [0xE0 | UInt8(bend.channel & 0x0F),
+                                UInt8(bend.value & 0x7F), UInt8((bend.value >> 7) & 0x7F)]))
+            }
+
             for note in track.notes {
                 let channel = UInt8(note.channel & 0x0F)
                 // A ZERO-LENGTH NOTE IS WIDENED TO ONE TICK, and this is not cosmetic. Releases

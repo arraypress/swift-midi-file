@@ -66,6 +66,7 @@ public struct Composition {
         public var program: Int?
         fileprivate var pending: [(pitch: Int, beat: Double, length: Double, velocity: Int)] = []
         fileprivate var controls: [(controller: Int, value: Int, beat: Double)] = []
+        fileprivate var bends: [(value: Int, beat: Double)] = []
 
         fileprivate init(name: String?, channel: Int, program: Int?) {
             self.name = name
@@ -116,6 +117,12 @@ public struct Composition {
         /// common case.
         public mutating func controlChange(_ controller: Int, value: Int, atBeat beat: Double) {
             controls.append((min(127, max(0, controller)), min(127, max(0, value)), max(0, beat)))
+        }
+
+        /// Add a pitch bend on this track's channel: a 14-bit value, 8192 at centre —
+        /// `PitchBend.value(semitones:range:)` computes one from a bend in semitones.
+        public mutating func pitchBend(_ value: Int, atBeat beat: Double) {
+            bends.append((min(PitchBend.maximum, max(0, value)), max(0, beat)))
         }
 
         /// Sustain pedal down (127) or up (0) at `beat`.
@@ -185,6 +192,10 @@ public struct Composition {
                                                  controller: $0.controller, value: $0.value) }
         }
 
+        let pitchBends = tracks.flatMap { builder in
+            builder.bends.map { PitchBend(atTicks: Int(($0.beat * ticks).rounded()), channel: builder.channel, value: $0.value) }
+        }
+
         return MIDIFile(
             format: built.count > 1 ? 1 : 0,
             division: division,
@@ -196,7 +207,8 @@ public struct Composition {
             markers: markers.map { (Int(($0.beat * ticks).rounded()), $0.text) },
             texts: [],
             instruments: instruments,
-            controlChanges: controlChanges)
+            controlChanges: controlChanges,
+            pitchBends: pitchBends)
     }
 
     /// Parse a pitch name — "C4", "F#2", "Bb3", "Eb-1" — into a MIDI note number.

@@ -294,4 +294,27 @@ final class WriterTests: XCTestCase {
         XCTAssertEqual(read.controlChanges.map(\.channel), [0, 0, 0])
         XCTAssertEqual(read.notes.map(\.velocity), [90, 70])
     }
+
+    /// Pitch bends written as 0xE0 (14-bit, low byte first) on the notes' channel, read back in order.
+    func testPitchBendsRoundTrip() throws {
+        var composition = Composition(bpm: 120, timeSignature: (4, 4), ticksPerQuarterNote: 480)
+        composition.addTrack(name: "lead", channel: 1, program: 80) { track in
+            track.note(69, atBeat: 0, lasting: 2, velocity: 100)
+            track.pitchBend(PitchBend.centre, atBeat: 0)
+            track.pitchBend(PitchBend.value(semitones: 1), atBeat: 0.5)
+            track.pitchBend(PitchBend.value(semitones: -2), atBeat: 1)
+            track.pitchBend(PitchBend.maximum, atBeat: 1.5)
+        }
+        let file = composition.build()
+        XCTAssertEqual(file.pitchBends.map(\.value), [8192, 12288, 0, 16383])
+        let data = try MIDIWriter.data(for: file)
+        let read = try MIDIReader.read(data)
+        XCTAssertEqual(read.pitchBends.map { ($0.atTicks, $0.value) }.map { "\($0)" },
+                       [(0, 8192), (240, 12288), (480, 0), (720, 16383)].map { "\($0)" })
+        XCTAssertEqual(read.pitchBends.map(\.channel), [1, 1, 1, 1])
+        XCTAssertEqual(read.pitchBends[1].semitones(), 1, accuracy: 0.001)
+        XCTAssertEqual(read.pitchBends[2].semitones(), -2, accuracy: 0.001)
+        XCTAssertEqual(read.pitchBends[3].semitones(range: 12), 12, accuracy: 0.001)
+        XCTAssertEqual(read.notes.map(\.pitch.number), [69])
+    }
 }
