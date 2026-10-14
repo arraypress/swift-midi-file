@@ -35,7 +35,7 @@ Every number here comes from the shipping code over a corpus of commercial tranc
 MIDI — 6,013 files whose folders and filenames name a key, so there is ground truth to score
 against.
 
-| | |
+| Measure | Result |
 |---|---|
 | Files parsed | **6,013 of 6,013**, no failures, in **0.9 s** |
 | Notes read | 468,589 |
